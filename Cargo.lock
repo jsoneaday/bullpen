@@ -5312,6 +5312,7 @@ version = "0.1.0"
 dependencies = [
  "async-trait",
  "axum",
+ "base64 0.22.1",
  "borsh 1.5.3",
  "chrono",
  "dotenv",
@@ -5319,6 +5320,7 @@ dependencies = [
  "futures",
  "serde",
  "serde_json",
+ "solana-account-decoder",
  "solana-client",
  "solana-sdk",
  "sqlx",

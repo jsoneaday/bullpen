@@ -1,5 +1,6 @@
-use solana_client::rpc_client::RpcClient;
+use solana_client::{nonblocking::pubsub_client::PubsubClient, rpc_client::RpcClient};
 
 pub struct AppState {
-    pub client: RpcClient
+    pub rpc_client: RpcClient,
+    pub ps_client: PubsubClient
 }

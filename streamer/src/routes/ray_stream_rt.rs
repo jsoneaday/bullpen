@@ -4,6 +4,6 @@ use crate::{controllers::ray_stream_ctrl::stream_ray_data, lib::app_state::AppSt
 
 pub fn get_raydium_stream_router(State(state): State<Arc<AppState>>) -> Router {
     Router::new()
-        .route("ray", get(stream_ray_data))
+        .route("/ray", get(stream_ray_data))
         .with_state(state)
 }
