@@ -6,6 +6,7 @@ pub mod routes {
 }
 pub mod lib {
     pub mod app_state;
+    pub mod ray_swaps;
     pub mod ray_decoder;
     pub mod responses {
         pub mod app_response;
