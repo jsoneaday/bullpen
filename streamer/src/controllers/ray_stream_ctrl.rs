@@ -31,66 +31,40 @@ pub async fn stream_ray_data(State(state): State<Arc<AppState>>, ws: WebSocketUp
                         Ok(axum::extract::ws::Message::Text(addr)) => {                            
                             let pool_key = Pubkey::from_str(&addr).unwrap();
                             
-                            let config = RpcAccountInfoConfig {
-                                encoding: Some(UiAccountEncoding::Base64),
-                                commitment: Some(CommitmentConfig::confirmed()),
-                                ..Default::default()
+                            let tx_config = RpcTransactionLogsConfig {
+                                commitment: Some(CommitmentConfig::confirmed())
                             };
-                            let (mut acc_sub, _acc_unsub) = ps_client
-                                .account_subscribe(&pool_key, Some(config))
+                            let (mut tx_sub, _tx_unsub) = ps_client
+                                .logs_subscribe(RpcTransactionLogsFilter::Mentions(vec![addr.clone()]), tx_config)
                                 .await
                                 .unwrap();
-
-                            println!("Subscribed to pool: {}", pool_key);
-
-                            while let Some(data) = acc_sub.next().await {
-                                match data.value.data {
-                                    UiAccountData::Binary(data_str, encoding) => {
-                                        match encoding {
-                                            UiAccountEncoding::Base64 => {
-                                                match RaydiumPool::decode(&BASE64_STANDARD.decode(&data_str).unwrap()) {
-                                                    Ok(ray_pool) => {
-                                                        println!("ray_pool {:?}", ray_pool);
-                                                        let tx_config = RpcTransactionLogsConfig {
-                                                            commitment: Some(CommitmentConfig::confirmed())
-                                                        };
-                                                        let (mut tx_sub, _tx_unsub) = ps_client
-                                                            .logs_subscribe(RpcTransactionLogsFilter::Mentions(vec![addr.clone()]), tx_config)
-                                                            .await
-                                                            .unwrap();
-                                                        
-                                                        while let Some(log_data) = tx_sub.next().await {
-                                                            println!("next log");
-                                                            if log_data.value.logs.iter().any(|log| log.contains("Swap")) {
-                                                                println!("log with Swap found!");
-                                                                if let Ok(tx_data) = rpc_client.get_transaction(
-                                                                    &Signature::from_str(&log_data.value.signature).unwrap(), 
-                                                                    UiTransactionEncoding::Json
-                                                                ) {                                                                    
-                                                                    let swap_info = extract_swap_details(&tx_data, &ray_pool);
-                                                                    println!("swap_info: {:?}", swap_info);
-                                                                    if let Ok(json) = serde_json::to_string(&swap_info) {
-                                                                        if let Err(e) = sender.send(axum::extract::ws::Message::Text(json)).await {
-                                                                            eprintln!("Failed to send tx swap data: {:?}", e);
-                                                                            break;
-                                                                        }
-                                                                    }
-                                                                }
-                                                            }
-                                                        }                                                  
-                                                    },
-                                                    Err(e) => {
-                                                        eprintln!("Error decoding solana data: {}", e);
-                                                        break;
-                                                    }
+                            
+                            while let Some(log_data) = tx_sub.next().await {
+                                println!("next log");
+                                if log_data.value.logs.iter().any(|log| log.contains("Swap")) {
+                                    println!("log with Swap found!");
+                                    if let Ok(tx_data) = rpc_client.get_transaction(
+                                        &Signature::from_str(&log_data.value.signature).unwrap(), 
+                                        UiTransactionEncoding::Json
+                                    ) {    
+                                        println!("tx_data found");
+                                        if let Ok(account) = rpc_client.get_account(&pool_key) {
+                                            let ray_pool = RaydiumPool::decode(&account.data).unwrap();
+                                            println!("ray_pool: {:?}", ray_pool);
+                                            let swap_info = extract_swap_details(&tx_data, &ray_pool);
+                                            println!("swap_info: {:?}", swap_info);
+                                            if let Ok(json) = serde_json::to_string(&swap_info) {
+                                                if let Err(e) = sender.send(axum::extract::ws::Message::Text(json)).await {
+                                                    eprintln!("Failed to send tx swap data: {:?}", e);
+                                                    break;
                                                 }
-                                            },
-                                            other => eprintln!("Binary: Unexpected data encoding format {:?}", other)
-                                        }
-                                    },
-                                    other => eprintln!("Unexpected data format {:?}", other)
+                                            }
+                                        } else {
+                                            println!("account not found");
+                                        }                                       
+                                    }
                                 }
-                            }
+                            }    
                         },
                         Ok(_) => {
                             println!("An unknown request was made");
