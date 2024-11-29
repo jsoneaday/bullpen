@@ -1,16 +1,19 @@
 use serde::Serialize;
 use solana_transaction_status::EncodedConfirmedTransactionWithStatusMeta;
 
-#[derive(Serialize)]
+use super::ray_pool::RaydiumPool;
+
+#[derive(Serialize, Clone, Debug)]
 pub struct SwapInfo {
     timestamp: i64,
     input_token: Option<String>,
     input_amount: Option<u64>,
     output_token: Option<String>,
-    output_amount: Option<u64>
+    output_amount: Option<u64>,
+    implied_price: f64
 }
 
-pub fn extract_swap_details(tx: &EncodedConfirmedTransactionWithStatusMeta) -> SwapInfo {
+pub fn extract_swap_details(tx: &EncodedConfirmedTransactionWithStatusMeta, ray_pool: &RaydiumPool) -> SwapInfo {
     let meta = tx.transaction.meta.as_ref().unwrap();
     let timestamp = tx.block_time.unwrap();
     let pre_token_balances = &meta.pre_token_balances.as_ref().unwrap();
@@ -55,6 +58,20 @@ pub fn extract_swap_details(tx: &EncodedConfirmedTransactionWithStatusMeta) -> S
         input_token,
         input_amount,
         output_token,
-        output_amount
+        output_amount,
+        implied_price: calculate_implied_price(ray_pool)
     }
+}
+
+pub fn calculate_implied_price(ray_pool: &RaydiumPool) -> f64 {
+    let sol_balance = ray_pool.token_a.balance as f64;
+    let token_balance = ray_pool.token_b.balance as f64;
+    
+    let sol_decimals = ray_pool.token_a.decimals;
+    let token_decimals = ray_pool.token_b.decimals;
+    
+    let adjusted_sol = sol_balance / (10_f64.powi(sol_decimals as i32));
+    let adjusted_token = token_balance / (10_f64.powi(token_decimals as i32));
+    
+    adjusted_token / adjusted_sol
 }

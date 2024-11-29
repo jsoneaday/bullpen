@@ -2,6 +2,7 @@ use borsh::{BorshDeserialize, BorshSerialize};
 use serde::Serialize;
 use solana_sdk::pubkey::Pubkey;
 
+
 #[derive(BorshDeserialize, BorshSerialize, Serialize, Debug)]
 pub struct RaydiumPool {
     pub nonce: u8,
